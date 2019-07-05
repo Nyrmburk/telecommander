@@ -28,6 +28,9 @@ import java.util.List;
 
 public class ScanActivity extends AppCompatActivity {
 
+    final static String SSID_PREFIX = "kinetikos";
+    final static String OUID = "a6a0bf";
+
     // my permissions
     // SCAN_FOR_ROBOT is used to find nearby robots with wifi scanning
     final static int MY_PERMISSION_SCAN_FOR_ROBOT = 0;
@@ -44,6 +47,8 @@ public class ScanActivity extends AppCompatActivity {
     DeviceAdapter deviceAdapter = null;
     ProgressBar scanningProgressBar = null;
     RecyclerView nearbyDevicesList = null;
+
+    BroadcastReceiver wifiScanReceiver = null;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -70,6 +75,13 @@ public class ScanActivity extends AppCompatActivity {
         super.onStart();
         System.out.println("started");
         scanWifi();
+    }
+
+    @Override
+    protected void onStop() {
+        super.onStop();
+        System.out.println("stopped");
+        stopScan();
     }
 
     private boolean requestPermissions(int requestCode, String... permissions) {
@@ -130,13 +142,14 @@ public class ScanActivity extends AppCompatActivity {
         wifiManager = (WifiManager)
                 context.getSystemService(Context.WIFI_SERVICE);
 
-        BroadcastReceiver wifiScanReceiver = new BroadcastReceiver() {
+        wifiScanReceiver = new BroadcastReceiver() {
             @Override
             public void onReceive(Context context, Intent intent) {
                 System.out.println("Got wifi scan results!");
 
-                svm.results = wifiManager.getScanResults();
+                svm.results = findRobots(wifiManager.getScanResults());
                 System.out.println(svm.results.size() + " elements: " + svm.results);
+
 
                 nearbyDevicesList.post(new Runnable() {
                     @Override
@@ -159,12 +172,43 @@ public class ScanActivity extends AppCompatActivity {
         System.out.println("can we scan? " + canScan);
     }
 
+    private void stopScan() {
+        if (wifiManager == null) {
+            return;
+        }
+        if (wifiScanReceiver == null) {
+            return;
+        }
+        Context context = getApplicationContext();
+        context.unregisterReceiver(wifiScanReceiver);
+        wifiScanReceiver = null;
+    }
+
+    private List<ScanResult> findRobots(List<ScanResult> scanResults) {
+        List<ScanResult> robots = new ArrayList<>(scanResults.size());
+        for (ScanResult result : scanResults) {
+            if (result.BSSID.toLowerCase().startsWith(OUID)) {
+                robots.add(result);
+            } else if (result.SSID.toLowerCase().startsWith(SSID_PREFIX)) {
+                robots.add(result);
+            }
+            robots.add(result); // TODO remove when done debugging
+        }
+        return robots;
+    }
+
+    public static void openWebInterface(View view) {
+        Intent intent = new Intent(view.getContext(), WebInterfaceActivity.class);
+        view.getContext().startActivity(intent);
+    }
+
     private static class DeviceAdapter extends RecyclerView.Adapter<DeviceAdapter.MyViewHolder> {
         private List<ScanResult> results = new ArrayList<>();
         private final View.OnClickListener mOnClickListener = new View.OnClickListener() {
             @Override
             public void onClick(View view) {
                 System.out.println("clicked");
+                openWebInterface(view);
             }
         };
 
