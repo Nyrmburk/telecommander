@@ -4,11 +4,11 @@ import androidx.annotation.NonNull;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.app.ActivityCompat;
 import androidx.core.content.ContextCompat;
+import androidx.lifecycle.ViewModelProviders;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 
 import android.Manifest;
-import android.app.Activity;
 import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
@@ -23,9 +23,10 @@ import android.view.ViewGroup;
 import android.widget.ProgressBar;
 import android.widget.TextView;
 
+import java.util.ArrayList;
 import java.util.List;
 
-public class MainActivity extends AppCompatActivity {
+public class ScanActivity extends AppCompatActivity {
 
     // my permissions
     // SCAN_FOR_ROBOT is used to find nearby robots with wifi scanning
@@ -36,26 +37,32 @@ public class MainActivity extends AppCompatActivity {
             Manifest.permission.CHANGE_WIFI_STATE
     };
 
-    // keep wifiManager around between lifecycles
-    static WifiManager wifiManager = null;
+    ScanViewModel svm;
 
-    ProgressBar searchingProgressBar = null;
-    static boolean isSearching = false;
+    WifiManager wifiManager = null;
+
+    DeviceAdapter deviceAdapter = null;
+    ProgressBar scanningProgressBar = null;
     RecyclerView nearbyDevicesList = null;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         System.out.println("created");
         super.onCreate(savedInstanceState);
-        setContentView(R.layout.activity_main);
+        setContentView(R.layout.activity_scan);
 
-        searchingProgressBar = findViewById(R.id.searchingProgressBar);
-        searchingProgressBar.setIndeterminate(isSearching); // re-creating the state is a pita
+        svm = ViewModelProviders.of(this).get(ScanViewModel.class);
+
+        scanningProgressBar = findViewById(R.id.scanningProgressBar);
+        scanningProgressBar.setIndeterminate(svm.isScanning);
+
+        deviceAdapter = new DeviceAdapter();
+        deviceAdapter.results = svm.results;
 
         nearbyDevicesList = findViewById(R.id.nearbyDevicesList);
-        nearbyDevicesList.setHasFixedSize(true);
+        nearbyDevicesList.setHasFixedSize(false);
         nearbyDevicesList.setLayoutManager(new LinearLayoutManager(this));
-        nearbyDevicesList.setAdapter(new DeviceAdapter());
+        nearbyDevicesList.setAdapter(deviceAdapter);
     }
 
     @Override
@@ -87,7 +94,7 @@ public class MainActivity extends AppCompatActivity {
         boolean granted = false;
         for (int grantResult : grantResults) {
             if (grantResult == PackageManager.PERMISSION_GRANTED) {
-                // If request is cancelled, the result arrays are empty.
+                // If request is cancelled, the results arrays are empty.
                 // only return granted true if there's at least one element
                 granted = true;
             } else {
@@ -128,8 +135,16 @@ public class MainActivity extends AppCompatActivity {
             public void onReceive(Context context, Intent intent) {
                 System.out.println("Got wifi scan results!");
 
-                List<ScanResult> results = wifiManager.getScanResults();
-                System.out.println(results.size() + " elements: " + results);
+                svm.results = wifiManager.getScanResults();
+                System.out.println(svm.results.size() + " elements: " + svm.results);
+
+                nearbyDevicesList.post(new Runnable() {
+                    @Override
+                    public void run() {
+                        deviceAdapter.results = svm.results;
+                        deviceAdapter.notifyDataSetChanged();
+                    }
+                });
             }
         };
 
@@ -138,14 +153,14 @@ public class MainActivity extends AppCompatActivity {
         context.registerReceiver(wifiScanReceiver, intentFilter);
         boolean canScan = wifiManager.startScan();
         if (canScan) {
-            isSearching = true;
-            searchingProgressBar.setIndeterminate(true);
+            svm.isScanning = true;
+            scanningProgressBar.setIndeterminate(true);
         }
         System.out.println("can we scan? " + canScan);
     }
 
     private static class DeviceAdapter extends RecyclerView.Adapter<DeviceAdapter.MyViewHolder> {
-        String[] data = {"hello there", "this is a device", "kinetikos"};
+        private List<ScanResult> results = new ArrayList<>();
         private final View.OnClickListener mOnClickListener = new View.OnClickListener() {
             @Override
             public void onClick(View view) {
@@ -154,11 +169,13 @@ public class MainActivity extends AppCompatActivity {
         };
 
         public static class MyViewHolder extends RecyclerView.ViewHolder {
-            // each data item is just a string in this case
             public TextView name;
+            public TextView bssid;
+
             public MyViewHolder(View v) {
                 super(v);
                 name = v.findViewById(R.id.deviceName);
+                bssid = v.findViewById(R.id.deviceMac);
             }
         }
 
@@ -173,12 +190,15 @@ public class MainActivity extends AppCompatActivity {
 
         @Override
         public void onBindViewHolder(@NonNull MyViewHolder holder, int position) {
-            holder.name.setText(data[position]);
+            System.out.println("binding new holder");
+            ScanResult r = results.get(position);
+            holder.name.setText(r.SSID);
+            holder.bssid.setText(r.BSSID);
         }
 
         @Override
         public int getItemCount() {
-            return data.length;
+            return results.size();
         }
     }
 }
