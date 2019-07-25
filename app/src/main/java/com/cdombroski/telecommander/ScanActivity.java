@@ -29,7 +29,7 @@ import java.util.List;
 public class ScanActivity extends AppCompatActivity {
 
     final static String SSID_PREFIX = "kinetikos";
-    final static String OUID = "a6a0bf";
+    final static String OUID = "a6:a0:bf";
 
     // my permissions
     // SCAN_FOR_ROBOT is used to find nearby robots with wifi scanning
@@ -180,7 +180,6 @@ public class ScanActivity extends AppCompatActivity {
             } else if (result.SSID.toLowerCase().startsWith(SSID_PREFIX)) {
                 robots.add(result);
             }
-            robots.add(result); // TODO remove when done debugging
         }
         return robots;
     }

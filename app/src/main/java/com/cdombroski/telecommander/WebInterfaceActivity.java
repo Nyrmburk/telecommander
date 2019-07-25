@@ -44,8 +44,7 @@ public class WebInterfaceActivity extends AppCompatActivity {
             Manifest.permission.CHANGE_NETWORK_STATE,
     };
 
-//    final static String KINETIKOS_ADDRESS = "192.168.4.1";
-    final static String KINETIKOS_ADDRESS = "https://cdombroski.com";
+    final static String KINETIKOS_ADDRESS = "http://192.168.4.1";
 
     private static long CONNECTING_ALERT_DELAY_MS = 100;
 
@@ -127,6 +126,7 @@ public class WebInterfaceActivity extends AppCompatActivity {
         if (webInterface != null && isWebLoaded) {
             return;
         }
+        System.out.println("loading: " + KINETIKOS_ADDRESS);
         webInterface.loadUrl(KINETIKOS_ADDRESS);
         isWebLoaded = true;
     }
